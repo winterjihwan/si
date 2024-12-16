@@ -11,6 +11,7 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct {
+  char *name;
   char *data;
   time_t write_time;
 } Resource;
@@ -37,7 +38,14 @@ typedef struct {
   size_t actions_count;
 } Tx;
 
-typedef enum { WRITE_LOG, READ_LOG } log_t;
+typedef enum {
+  BEGIN_TX_LOG,
+  WRITE_LOG,
+  READ_LOG,
+  ABORT_LOG,
+  ABORT_TX_LOG,
+  COMMIT_TX_LOG
+} log_t;
 typedef struct {
   log_t type;
   time_t time;
@@ -61,6 +69,10 @@ int tx_should_compare(const Tx *t1, const Tx *t2) {
 
 int tx_is_conflict(const Tx *tx) {
   for (size_t i = 0; i < tx->actions_count; i++) {
+    if (tx->actions[i].type != WRITE) {
+      continue;
+    }
+
     const time_t resource_write_time = tx->actions[i].rs->write_time;
     if (tx->start_time <= resource_write_time &&
         resource_write_time <= tx->commit_time) {
@@ -108,6 +120,37 @@ void tx_write(Tx *tx, Resource *rs, char *new_data) {
   tx->actions[tx->actions_count++] = act;
 }
 
+void tx_abort(Tx *tx) {
+  assert(tx->actions_count + 1 <= MAX_ACTIONS);
+
+  const Log log = {
+      .type = ABORT_TX_LOG,
+      .tx_id = tx->id,
+      .time = TIME++,
+  };
+  log_store(log);
+
+  for (size_t i = STABLE_STORAGE_COUNT - 1; i >= 0; i--) {
+    if (STABLE_STORAGE[i].tx_id == tx->id) {
+      const Log log = STABLE_STORAGE[i];
+      if (log.type == BEGIN_TX_LOG) {
+        break;
+      }
+
+      if (log.type == WRITE_LOG) {
+        log.rs->data = log.prev;
+
+        const Log log = {.type = ABORT_LOG,
+                         .tx_id = tx->id,
+                         .rs = log.rs,
+                         .time = TIME++,
+                         .after = log.prev};
+        log_store(log);
+      }
+    }
+  }
+}
+
 void tx_commit(Tx *tx) {
   tx->commit_time = TIME++;
   tx->state = COMMITTED;
@@ -117,7 +160,8 @@ void tx_commit(Tx *tx) {
       printf("Should compare %s and %s\n", tx->name, GLOBAL_TXS[i].name);
       if (tx_is_conflict(tx)) {
         printf("Should abort tx %s\n", tx->name);
-        // TODO: abort
+        tx_abort(tx);
+        return;
       }
     }
   }
@@ -127,6 +171,13 @@ void tx_commit(Tx *tx) {
       tx->actions[i].rs->write_time = tx->commit_time;
     }
   }
+
+  const Log log = {
+      .type = COMMIT_TX_LOG,
+      .tx_id = tx->id,
+      .time = TIME++,
+  };
+  log_store(log);
 }
 
 const char *action_t_to_string(const action_t action_t) {
@@ -146,6 +197,14 @@ const char *log_t_to_string(const log_t log_t) {
     return "read";
   case WRITE_LOG:
     return "write";
+  case BEGIN_TX_LOG:
+    return "begin_tx";
+  case ABORT_LOG:
+    return "abort_tx";
+  case ABORT_TX_LOG:
+    return "abort";
+  case COMMIT_TX_LOG:
+    return "commit_tx";
   default:
     return "undefined";
   }
@@ -169,7 +228,9 @@ void log_print(Log *log) {
   printf("Log at time: %ld\n", log->time);
   printf("\ttype: %s\n", log_t_to_string(log->type));
   printf("\ttx id: %ld\n", log->tx_id);
-  printf("\tresource: %s\n", log->rs->data);
+  if (log->type == READ_LOG || log->type == WRITE_LOG) {
+    printf("\tresource: %s\n", log->rs->data);
+  }
   if (log->type == WRITE_LOG) {
     printf("\tprev: %s\n", log->prev);
     printf("\tafter: %s\n", log->after);
@@ -196,26 +257,27 @@ void tx_schedule_dump(const Tx *t1, const Tx *t2) {
   size_t max_time =
       MAX(t1->actions[t1_last_el_idx].time, t2->actions[t2_last_el_idx].time);
 
-  printf("t   |          %s          |            %s            \n", t1->name,
-         t2->name);
+  printf("t   |      %s      |        %s        \n", t1->name, t2->name);
   printf("-------------------------------\n");
   for (size_t i = 0; i <= max_time; i++) {
     for (size_t j = 0; j < t1->actions_count; j++) {
       if (t1->actions[j].time == (time_t)i) {
         const Action act = t1->actions[j];
-        printf("%4zu|%11s(%s)|                \n", i,
-               action_t_to_string(act.type), act.rs->data);
+        printf("%4zu|%11s(%s)|              \n", i,
+               action_t_to_string(act.type), act.rs->name);
       };
     }
 
     for (size_t j = 0; j < t2->actions_count; j++) {
       if (t2->actions[j].time == (time_t)i) {
         const Action act = t2->actions[j];
-        printf("%4zu|                      |%11s(%s) \n", i,
-               action_t_to_string(act.type), act.rs->data);
+        printf("%4zu|              |%11s(%s) \n", i,
+               action_t_to_string(act.type), act.rs->name);
       };
     }
   };
+
+  printf("\n");
 }
 
 inline static Tx *tx_new(char *name) {
@@ -235,24 +297,29 @@ inline static Tx *tx_new(char *name) {
   GLOBAL_TXS[GLOBAL_TXS_COUNT++] = tx;
   TIME++;
 
+  const Log log = {
+      .type = BEGIN_TX_LOG,
+      .tx_id = tx.id,
+      .time = TIME++,
+  };
+  log_store(log);
+
   return &GLOBAL_TXS[tx_idx];
 }
 
-inline static Resource *resource_new(char *data) {
+inline static Resource *resource_new(char *name, char *data) {
   assert(RESOURCES_COUNT + 1 < MAX_RESOURCES);
 
   const size_t rs_idx = RESOURCES_COUNT;
-  const time_t now = TIME;
 
-  const Resource rs = {.data = data, .write_time = now};
+  const Resource rs = {.name = name, .data = data, .write_time = TIME};
   RESOURCES[RESOURCES_COUNT++] = rs;
-  TIME++;
 
   return &RESOURCES[rs_idx];
 }
 
 int main(void) {
-  Resource *r1 = resource_new("Hi goblin!");
+  Resource *r1 = resource_new("A", "Hi goblin!");
 
   Tx *t1 = tx_new("T1");
 
@@ -267,6 +334,6 @@ int main(void) {
   tx_commit(t2);
 
   tx_schedule_dump(t1, t2);
-  /*stable_storage_dump();*/
+  stable_storage_dump();
   global_txs_dump();
 }
