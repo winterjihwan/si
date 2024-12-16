@@ -42,7 +42,7 @@ typedef enum {
   BEGIN_TX_LOG,
   WRITE_LOG,
   READ_LOG,
-  ABORT_LOG,
+  RECOVER_LOG,
   ABORT_TX_LOG,
   COMMIT_TX_LOG
 } log_t;
@@ -81,6 +81,68 @@ int tx_is_conflict(const Tx *tx) {
   }
 
   return 0;
+}
+
+const char *action_t_to_string(const action_t action_t) {
+  switch (action_t) {
+  case READ:
+    return "read";
+  case WRITE:
+    return "write";
+  default:
+    return "undefined";
+  }
+}
+
+const char *log_t_to_string(const log_t log_t) {
+  switch (log_t) {
+  case READ_LOG:
+    return "read";
+  case WRITE_LOG:
+    return "write";
+  case BEGIN_TX_LOG:
+    return "begin_tx";
+  case ABORT_TX_LOG:
+    return "abort_tx";
+  case RECOVER_LOG:
+    return "recover";
+  case COMMIT_TX_LOG:
+    return "commit_tx";
+  default:
+    return "undefined";
+  }
+}
+
+void tx_print(Tx *tx) {
+  printf("%s\n", tx->name);
+  printf("Started: %ld\n", (long)tx->start_time);
+  if (tx->state >= COMMITTED)
+    printf("Commited: %ld\n", (long)tx->commit_time);
+
+  for (size_t i = 0; i < tx->actions_count; i++) {
+    printf("Action %zu: \n", i);
+    printf("\ttype: %s\n", action_t_to_string(tx->actions[i].type));
+    printf("\time: %ld\n", (long)tx->actions[i].time);
+    printf("\n");
+  }
+}
+
+void log_print(const Log *log) {
+  printf("Log at time: %ld\n", log->time);
+  printf("\ttype: %s\n", log_t_to_string(log->type));
+  printf("\ttx id: %ld\n", log->tx_id);
+  if (log->type == READ_LOG || log->type == WRITE_LOG) {
+    printf("\tresource: %s\n", log->rs->name);
+  }
+  if (log->type == WRITE_LOG) {
+    printf("\tprev: %s\n", log->prev);
+  }
+
+  if (log->type == WRITE_LOG || log->type == RECOVER_LOG) {
+    printf("\tafter: %s\n", log->after);
+  }
+
+  printf("\n");
 }
 
 inline static void log_store(Log log) {
@@ -140,7 +202,7 @@ void tx_abort(Tx *tx) {
       if (log.type == WRITE_LOG) {
         log.rs->data = log.prev;
 
-        const Log log = {.type = ABORT_LOG,
+        const Log log = {.type = RECOVER_LOG,
                          .tx_id = tx->id,
                          .rs = log.rs,
                          .time = TIME++,
@@ -157,9 +219,7 @@ void tx_commit(Tx *tx) {
 
   for (size_t i = 0; i < GLOBAL_TXS_COUNT; i++) {
     if (tx_should_compare(tx, &GLOBAL_TXS[i])) {
-      printf("Should compare %s and %s\n", tx->name, GLOBAL_TXS[i].name);
       if (tx_is_conflict(tx)) {
-        printf("Should abort tx %s\n", tx->name);
         tx_abort(tx);
         return;
       }
@@ -178,64 +238,6 @@ void tx_commit(Tx *tx) {
       .time = TIME++,
   };
   log_store(log);
-}
-
-const char *action_t_to_string(const action_t action_t) {
-  switch (action_t) {
-  case READ:
-    return "read";
-  case WRITE:
-    return "write";
-  default:
-    return "undefined";
-  }
-}
-
-const char *log_t_to_string(const log_t log_t) {
-  switch (log_t) {
-  case READ_LOG:
-    return "read";
-  case WRITE_LOG:
-    return "write";
-  case BEGIN_TX_LOG:
-    return "begin_tx";
-  case ABORT_LOG:
-    return "abort_tx";
-  case ABORT_TX_LOG:
-    return "abort";
-  case COMMIT_TX_LOG:
-    return "commit_tx";
-  default:
-    return "undefined";
-  }
-}
-
-void tx_print(Tx *tx) {
-  printf("%s\n", tx->name);
-  printf("Started: %ld\n", (long)tx->start_time);
-  if (tx->state >= COMMITTED)
-    printf("Commited: %ld\n", (long)tx->commit_time);
-
-  for (size_t i = 0; i < tx->actions_count; i++) {
-    printf("Action %zu: \n", i);
-    printf("\ttype: %s\n", action_t_to_string(tx->actions[i].type));
-    printf("\time: %ld\n", (long)tx->actions[i].time);
-    printf("\n");
-  }
-}
-
-void log_print(Log *log) {
-  printf("Log at time: %ld\n", log->time);
-  printf("\ttype: %s\n", log_t_to_string(log->type));
-  printf("\ttx id: %ld\n", log->tx_id);
-  if (log->type == READ_LOG || log->type == WRITE_LOG) {
-    printf("\tresource: %s\n", log->rs->data);
-  }
-  if (log->type == WRITE_LOG) {
-    printf("\tprev: %s\n", log->prev);
-    printf("\tafter: %s\n", log->after);
-  }
-  printf("\n");
 }
 
 void global_txs_dump(void) {
@@ -329,6 +331,8 @@ int main(void) {
   Tx *t2 = tx_new("T2");
 
   tx_commit(t1);
+
+  tx_write(t2, r1, "Welcome to Seoul");
 
   tx_read(t2, r1);
   tx_commit(t2);
