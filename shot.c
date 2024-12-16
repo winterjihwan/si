@@ -12,7 +12,6 @@
 typedef struct {
   char *data;
   time_t write_time;
-  time_t read_time;
 } Resource;
 
 typedef enum { READ, WRITE } action_t;
@@ -92,6 +91,22 @@ void tx_read(Tx *tx, Resource *rs) {
   tx->actions[tx->actions_count++] = act;
 }
 
+void tx_write(Tx *tx, Resource *rs, char *new_data) {
+  assert(tx->actions_count + 1 <= MAX_ACTIONS);
+
+  const Log log = {.type = WRITE_LOG,
+                   .tx_id = tx->id,
+                   .rs = rs,
+                   .time = TIME++,
+                   .prev = rs->data,
+                   .after = new_data};
+  log_store(log);
+
+  rs->data = new_data;
+  const Action act = {.time = TIME++, .type = WRITE, .rs = rs};
+  tx->actions[tx->actions_count++] = act;
+}
+
 void tx_commit(Tx *tx) {
   tx->commit_time = TIME++;
   tx->state = COMMITTED;
@@ -100,8 +115,15 @@ void tx_commit(Tx *tx) {
     if (tx_should_compare(tx, &GLOBAL_TXS[i])) {
       printf("Should compare %s and %s\n", tx->name, GLOBAL_TXS[i].name);
       if (tx_is_conflict(tx)) {
+        printf("Should abort tx %s\n", tx->name);
         // abort
       }
+    }
+  }
+
+  for (size_t i = 0; i < tx->actions_count; i++) {
+    if (tx->actions[i].type == WRITE) {
+      tx->actions[i].rs->write_time = tx->commit_time;
     }
   }
 }
@@ -192,7 +214,7 @@ inline static Resource *resource_new(char *data) {
   const size_t rs_idx = RESOURCES_COUNT;
   const time_t now = TIME;
 
-  const Resource rs = {.data = data, .write_time = now, .read_time = now};
+  const Resource rs = {.data = data, .write_time = now};
   RESOURCES[RESOURCES_COUNT++] = rs;
   TIME++;
 
@@ -202,14 +224,16 @@ inline static Resource *resource_new(char *data) {
 int main(void) {
   Tx *t1 = tx_new("T1");
 
-  Resource *r1 = resource_new("Resource A");
+  Resource *r1 = resource_new("Hi goblin!");
 
   tx_read(t1, r1);
+
+  tx_write(t1, r1, "Hi angel!");
+  tx_commit(t1);
 
   Tx *t2 = tx_new("T2");
 
   tx_read(t2, r1);
-  tx_commit(t1);
   tx_commit(t2);
 
   stable_storage_dump();
