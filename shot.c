@@ -8,6 +8,7 @@
 #define MAX_RESOURCES 5
 #define MAX_ACTIONS 10
 #define MAX_LOGS 100
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct {
   char *data;
@@ -116,7 +117,7 @@ void tx_commit(Tx *tx) {
       printf("Should compare %s and %s\n", tx->name, GLOBAL_TXS[i].name);
       if (tx_is_conflict(tx)) {
         printf("Should abort tx %s\n", tx->name);
-        // abort
+        // TODO: abort
       }
     }
   }
@@ -159,7 +160,7 @@ void tx_print(Tx *tx) {
   for (size_t i = 0; i < tx->actions_count; i++) {
     printf("Action %zu: \n", i);
     printf("\ttype: %s\n", action_t_to_string(tx->actions[i].type));
-    printf("\tstart: %ld\n", (long)tx->actions[i].time);
+    printf("\time: %ld\n", (long)tx->actions[i].time);
     printf("\n");
   }
 }
@@ -186,6 +187,35 @@ void stable_storage_dump(void) {
   for (size_t i = 0; i < STABLE_STORAGE_COUNT; i++) {
     log_print(&STABLE_STORAGE[i]);
   }
+}
+
+void tx_schedule_dump(const Tx *t1, const Tx *t2) {
+  size_t t1_last_el_idx = t1->actions_count - 1;
+  size_t t2_last_el_idx = t2->actions_count - 1;
+
+  size_t max_time =
+      MAX(t1->actions[t1_last_el_idx].time, t2->actions[t2_last_el_idx].time);
+
+  printf("t  |          %s          |            %s            \n", t1->name,
+         t2->name);
+  printf("-------------------------------\n");
+  for (size_t i = 0; i <= max_time; i++) {
+    for (size_t j = 0; j < t1->actions_count; j++) {
+      if (t1->actions[j].time == (time_t)i) {
+        const Action act = t1->actions[j];
+        printf("%zu |   %s(%s)   |       \n", i, action_t_to_string(act.type),
+               act.rs->data);
+      };
+    }
+
+    for (size_t j = 0; j < t2->actions_count; j++) {
+      if (t2->actions[j].time == (time_t)i) {
+        const Action act = t2->actions[j];
+        printf("%zu |                        | %s(%s) \n", i,
+               action_t_to_string(act.type), act.rs->data);
+      };
+    }
+  };
 }
 
 inline static Tx *tx_new(char *name) {
@@ -222,20 +252,21 @@ inline static Resource *resource_new(char *data) {
 }
 
 int main(void) {
-  Tx *t1 = tx_new("T1");
-
   Resource *r1 = resource_new("Hi goblin!");
 
-  tx_read(t1, r1);
+  Tx *t1 = tx_new("T1");
 
+  tx_read(t1, r1);
   tx_write(t1, r1, "Hi angel!");
-  tx_commit(t1);
 
   Tx *t2 = tx_new("T2");
+
+  tx_commit(t1);
 
   tx_read(t2, r1);
   tx_commit(t2);
 
-  stable_storage_dump();
+  tx_schedule_dump(t1, t2);
+  /*stable_storage_dump();*/
   global_txs_dump();
 }
