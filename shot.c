@@ -196,22 +196,22 @@ void tx_schedule_dump(const Tx *t1, const Tx *t2) {
   size_t max_time =
       MAX(t1->actions[t1_last_el_idx].time, t2->actions[t2_last_el_idx].time);
 
-  printf("t  |          %s          |            %s            \n", t1->name,
+  printf("t   |          %s          |            %s            \n", t1->name,
          t2->name);
   printf("-------------------------------\n");
   for (size_t i = 0; i <= max_time; i++) {
     for (size_t j = 0; j < t1->actions_count; j++) {
       if (t1->actions[j].time == (time_t)i) {
         const Action act = t1->actions[j];
-        printf("%zu |   %s(%s)   |       \n", i, action_t_to_string(act.type),
-               act.rs->data);
+        printf("%4zu|%11s(%s)|                \n", i,
+               action_t_to_string(act.type), act.rs->data);
       };
     }
 
     for (size_t j = 0; j < t2->actions_count; j++) {
       if (t2->actions[j].time == (time_t)i) {
         const Action act = t2->actions[j];
-        printf("%zu |                        | %s(%s) \n", i,
+        printf("%4zu|                      |%11s(%s) \n", i,
                action_t_to_string(act.type), act.rs->data);
       };
     }
