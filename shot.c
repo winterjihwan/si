@@ -194,20 +194,20 @@ void tx_abort(Tx *tx) {
 
   for (size_t i = STABLE_STORAGE_COUNT - 1; i >= 0; i--) {
     if (STABLE_STORAGE[i].tx_id == tx->id) {
-      const Log log = STABLE_STORAGE[i];
-      if (log.type == BEGIN_TX_LOG) {
+      const Log *log = &STABLE_STORAGE[i];
+      if (log->type == BEGIN_TX_LOG) {
         break;
       }
 
-      if (log.type == WRITE_LOG) {
-        log.rs->data = log.prev;
+      if (log->type == WRITE_LOG) {
+        log->rs->data = log->prev;
 
-        const Log log = {.type = RECOVER_LOG,
-                         .tx_id = tx->id,
-                         .rs = log.rs,
-                         .time = TIME++,
-                         .after = log.prev};
-        log_store(log);
+        const Log recovery_log = {.type = RECOVER_LOG,
+                                  .tx_id = tx->id,
+                                  .rs = log->rs,
+                                  .time = TIME++,
+                                  .after = log->prev};
+        log_store(recovery_log);
       }
     }
   }
