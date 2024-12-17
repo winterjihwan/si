@@ -127,6 +127,12 @@ void tx_print(Tx *tx) {
   }
 }
 
+void rs_print(Resource *rs) {
+  printf("Resource %s\n", rs->name);
+  printf("\tlast write: %ld\n", (long)rs->write_time);
+  printf("\tdata %s\n", rs->data);
+}
+
 void log_print(const Log *log) {
   printf("Log at time: %ld\n", log->time);
   printf("\ttype: %s\n", log_t_to_string(log->type));
@@ -246,6 +252,12 @@ void global_txs_dump(void) {
   }
 }
 
+void resources_dump(void) {
+  for (size_t i = 0; i < RESOURCES_COUNT; i++) {
+    rs_print(&RESOURCES[i]);
+  }
+}
+
 void stable_storage_dump(void) {
   for (size_t i = 0; i < STABLE_STORAGE_COUNT; i++) {
     log_print(&STABLE_STORAGE[i]);
@@ -337,7 +349,8 @@ int main(void) {
   tx_read(t2, r1);
   tx_commit(t2);
 
-  tx_schedule_dump(t1, t2);
-  stable_storage_dump();
-  global_txs_dump();
+  resources_dump();
+  /*tx_schedule_dump(t1, t2);*/
+  /*stable_storage_dump();*/
+  /*global_txs_dump();*/
 }

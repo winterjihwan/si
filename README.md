@@ -13,3 +13,4 @@ make shot
 [] two phase locking
 [] wait for graphs for deadlock detection
 [] fuzzy testing
+[] cascadeless
