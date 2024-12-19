@@ -5,3 +5,6 @@ main: main.c
 
 esai: esai.c
 	$(CC) $(CFLAGS) -o esai esai.c
+
+disk: disk.c
+	$(CC) $(CFLAGS) -o disk disk.c

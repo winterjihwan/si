@@ -7,10 +7,3 @@ snapshot isolation is one of the more common optimistic concurrency control algo
 make shot
 ./shot
 ```
-
-## improvements
-
-[] two phase locking
-[] wait for graphs for deadlock detection
-[] fuzzy testing
-[] cascadeless
