@@ -1,59 +1,8 @@
+#include "esai.h"
 #include "assert.h"
 #include "time.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-#define MAX_TIME 0x7FFFFFFE
-#define MAX_GLOBAL_TXS 10
-#define MAX_RESOURCES 5
-#define MAX_ACTIONS 10
-#define MAX_LOGS 100
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-typedef struct {
-  char *name;
-  char *data;
-  time_t write_time;
-} Resource;
-
-typedef enum { READ, WRITE } action_t;
-typedef struct {
-  time_t time;
-  action_t type;
-  Resource *rs;
-} Action;
-
-typedef long tx_id;
-typedef enum { STARTED, COMMITTED, ENDED } tx_state;
-typedef struct {
-  char *name;
-  tx_id id;
-  tx_state state;
-
-  time_t start_time;
-  time_t commit_time;
-  time_t end_time;
-
-  Action actions[10];
-  size_t actions_count;
-} Tx;
-
-typedef enum {
-  BEGIN_TX_LOG,
-  WRITE_LOG,
-  READ_LOG,
-  RECOVER_LOG,
-  ABORT_TX_LOG,
-  COMMIT_TX_LOG
-} log_t;
-typedef struct {
-  log_t type;
-  time_t time;
-  tx_id tx_id;
-  Resource *rs;
-  char *prev;
-  char *after;
-} Log;
 
 static time_t TIME = 0x01;
 static Tx GLOBAL_TXS[MAX_GLOBAL_TXS] = {0};
@@ -272,7 +221,7 @@ void tx_schedule_dump(const Tx *t1, const Tx *t2) {
       MAX(t1->actions[t1_last_el_idx].time, t2->actions[t2_last_el_idx].time);
 
   printf("t   |      %s      |        %s        \n", t1->name, t2->name);
-  printf("-------------------------------\n");
+  printf("--------------------------------------\n");
   for (size_t i = 0; i <= max_time; i++) {
     for (size_t j = 0; j < t1->actions_count; j++) {
       if (t1->actions[j].time == (time_t)i) {
@@ -349,8 +298,8 @@ int main(void) {
   tx_read(t2, r1);
   tx_commit(t2);
 
-  resources_dump();
-  /*tx_schedule_dump(t1, t2);*/
+  /*resources_dump();*/
+  tx_schedule_dump(t1, t2);
   /*stable_storage_dump();*/
   /*global_txs_dump();*/
 }
