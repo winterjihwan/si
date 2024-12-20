@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /*
  * Statically sized hash table
@@ -44,27 +45,11 @@ inline static HashKey key_hash(const char *key_str) {
   return key;
 }
 
-static void bucket_insert(HashTable *table, Bucket bucket) {
-  const HashKey key_index = bucket.key % HASH_TABLE_SIZE;
-
-  assert(key_index < HASH_TABLE_SIZE);
-
-  HashTableNode *node = &table->nodes[key_index];
-  assert(node->buckets_count + 1 < MAX_OVERFLOW_CHAINING);
-
-  bucket.next = &node->buckets[node->buckets_count];
-  node->buckets[node->buckets_count++] = bucket;
-}
-
-static Bucket bucket_new(char *key_str, const void *data) {
-  HashKey key = key_hash(key_str);
-  Bucket b = {.key = key, .data = data};
-
-  return b;
-}
-
-void hash_table_insert(HashTable *table, char *key_str, const void *data);
+void hash_table_insert(HashTable *table, char *key_str, const void *data,
+                       const unsigned long data_size);
+void hash_table_update(HashTable *table, char *key_str, const void *new_data);
 const void *hash_table_get(const HashTable *table, char *key_str);
 void hash_table_delete(const HashTable *table, char *key_str);
+void hash_table_dump(const HashTable *table);
 
 #endif

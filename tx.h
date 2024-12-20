@@ -40,8 +40,8 @@ const char *action_t_to_string(const action_t action_t);
 void tx_print(Tx *tx);
 void rs_print(Resource *rs);
 
-void tx_read(Tx *tx, Resource *rs);
-void tx_write(Tx *tx, Resource *rs, char *new_data);
+void tx_read(Tx *tx, Table *table, char *rs_name);
+void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data);
 void tx_abort(Tx *tx);
 void tx_commit(Tx *tx);
 

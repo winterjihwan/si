@@ -24,11 +24,13 @@ typedef struct {
   char *data;
 } Resource;
 
-void disk_insert(Disk *disk, char *table_name, const Resource *resource);
 Table *disk_table_new(Disk *disk, char *table_name);
 Resource *disk_table_read(Table *table, char *key_str);
+void disk_table_update(Table *table, char *key_str, char *new_data);
+void disk_table_insert(Table *table, const Resource resource);
+void disk_table_dump(const Table *table);
 
-void resource_print(Resource *resource);
+void resource_print(const Resource *resource);
 Resource resource_new(time_t version, char *name, char *data);
 
 #endif

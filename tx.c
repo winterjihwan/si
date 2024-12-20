@@ -63,35 +63,38 @@ void rs_print(Resource *rs) {
   printf("\tdata %s\n", rs->data);
 }
 
-void tx_read(Tx *tx, Resource *rs) {
+void tx_read(Tx *tx, Table *table, char *rs_name) {
   assert(tx->actions_count + 1 <= MAX_ACTIONS);
+
+  Resource rs = *disk_table_read(table, rs_name);
 
   const Log log = {
       .type = READ_LOG,
       .tx_id = tx->id,
-      .rs = rs,
+      .rs = &rs,
       .time = TIME++,
   };
   recovery_log_store(log);
 
-  const Action act = {.time = TIME++, .type = READ, .rs = rs};
+  const Action act = {.time = TIME++, .type = READ, .rs = &rs};
 
   tx->actions[tx->actions_count++] = act;
 }
 
-void tx_write(Tx *tx, Resource *rs, char *new_data) {
+void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data) {
   assert(tx->actions_count + 1 <= MAX_ACTIONS);
+
+  Resource rs = *disk_table_read(table, rs_name);
 
   const Log log = {.type = WRITE_LOG,
                    .tx_id = tx->id,
-                   .rs = rs,
+                   .rs = &rs,
                    .time = TIME++,
-                   .prev = rs->data,
+                   .prev = rs.data,
                    .after = new_data};
   recovery_log_store(log);
 
-  rs->data = new_data;
-  const Action act = {.time = TIME++, .type = WRITE, .rs = rs};
+  const Action act = {.time = TIME++, .type = WRITE, .rs = &rs};
   tx->actions[tx->actions_count++] = act;
 }
 
@@ -208,26 +211,31 @@ static Disk DISK = {0};
 
 int main(void) {
   //-Setup-//
-  Resource r1 = resource_new(TIME++, "A", "Hi goblin!");
+  Resource r1 = resource_new(TIME++, "X", "Hi goblin!");
   Table *tableA = disk_table_new(&DISK, "Table A");
+  disk_table_insert(tableA, r1);
   //------//
 
   Tx *t1 = tx_new("T1");
 
-  tx_read(t1, &r1);
-  tx_write(t1, &r1, "Hi angel!");
+  tx_read(t1, tableA, "X");
+  tx_write(t1, tableA, "X", "Hi angel!");
+
+  disk_table_dump(tableA);
 
   Tx *t2 = tx_new("T2");
 
   tx_commit(t1);
 
-  tx_write(t2, &r1, "Welcome to Seoul");
+  tx_write(t2, tableA, "X", "Welcome to Seoul");
 
-  tx_read(t2, &r1);
+  disk_table_dump(tableA);
+
+  tx_read(t2, tableA, "X");
   tx_commit(t2);
 
   /*resources_dump();*/
-  tx_schedule_dump(t1, t2);
+  /*tx_schedule_dump(t1, t2);*/
   /*stable_storage_dump();*/
   /*global_txs_dump();*/
 }
