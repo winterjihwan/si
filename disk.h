@@ -1,70 +1,35 @@
 #ifndef DISK_H
 #define DISK_H
 
-#include <assert.h>
-#include <stdint.h>
+#include "table.h"
 #include <stdio.h>
-#include <stdlib.h>
+#include <time.h>
 
-/*
- * Statically sized hash table
- * used for implementing database
- */
+#define DISK_TABLE_CAPACITY 5
 
-typedef uint16_t HashKey;
-typedef struct Bucket Bucket;
-typedef struct HashTableNode HashTableNode;
-
-struct Bucket {
-  HashKey key;
-  const void *data;
-  Bucket *next;
+typedef struct Table Table;
+struct Table {
+  char *name;
+  HashTable table;
 };
-
-#define MAX_OVERFLOW_CHAINING 3
-
-struct HashTableNode {
-  Bucket buckets[MAX_OVERFLOW_CHAINING];
-  size_t buckets_count;
-};
-
-#define HASH_TABLE_SIZE 50
 
 typedef struct {
-  HashTableNode nodes[HASH_TABLE_SIZE];
-} HashTable;
+  Table database[DISK_TABLE_CAPACITY];
+  size_t table_count;
+} Disk;
 
-inline static HashKey key_hash(const char *key_str) {
-  HashKey key = 5381;
+typedef struct {
+  time_t version;
+  char *data;
+} Resource;
 
-  for (size_t i = 0; key_str[i] != '\0'; i++) {
-    key = ((key << 5) + key) + key_str[i];
-  }
+void disk_table_new(Disk *disk, char *table_name);
 
-  return key;
-}
+void disk_insert(Disk *disk, char *table_name, char *key_str,
+                 const Resource *resource);
 
-static void bucket_insert(HashTable *table, Bucket bucket) {
-  const HashKey key_index = bucket.key % HASH_TABLE_SIZE;
+Resource *disk_read(Disk *disk, char *table_name, char *key_str);
 
-  assert(key_index < HASH_TABLE_SIZE);
-
-  HashTableNode *node = &table->nodes[key_index];
-  assert(node->buckets_count + 1 < MAX_OVERFLOW_CHAINING);
-
-  bucket.next = &node->buckets[node->buckets_count];
-  node->buckets[node->buckets_count++] = bucket;
-}
-
-static Bucket bucket_new(char *key_str, const void *data) {
-  HashKey key = key_hash(key_str);
-  Bucket b = {.key = key, .data = data};
-
-  return b;
-}
-
-void table_insert(HashTable *table, char *key_str, const void *data);
-const void *table_get(const HashTable *table, char *key_str);
-void table_delete(const HashTable *table, char *key_str);
+void resource_print(char *name, Resource *resource);
 
 #endif

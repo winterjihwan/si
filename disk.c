@@ -1,64 +1,57 @@
 #include "disk.h"
+#include "table.h"
+#include <assert.h>
 #include <stdio.h>
 
-static HashTable HASH_TABLE = {0};
+static Disk DISK = {0};
+static time_t GLOBAL_CLOCK = {0};
 
-void table_insert(HashTable *table, char *key_str, const void *data) {
-  Bucket bucket = bucket_new(key_str, data);
-  bucket_insert(table, bucket);
+void disk_table_new(Disk *disk, char *table_name) {
+  assert(disk->table_count + 1 < DISK_TABLE_CAPACITY);
+  Table table = {
+      .name = table_name,
+  };
+
+  disk->database[disk->table_count++] = table;
 }
 
-const void *table_get(const HashTable *table, char *key_str) {
-  const HashKey key = key_hash(key_str);
+void disk_insert(Disk *disk, char *table_name, char *key_str,
+                 const Resource *resource) {
+  for (size_t i = 0; i < DISK_TABLE_CAPACITY; i++) {
+    Table *table = &disk->database[i];
+    if (table->name != table_name)
+      continue;
 
-  HashTableNode node = table->nodes[key % HASH_TABLE_SIZE];
+    hash_table_insert(&table->table, key_str, resource);
+    return;
+  }
+}
 
-  for (size_t i = 0; i < node.buckets_count; i++) {
-    Bucket *bucket = &node.buckets[i];
-    if (bucket->key == key) {
-      return bucket->data;
-    }
+Resource *disk_read(Disk *disk, char *table_name, char *key_str) {
+  for (size_t i = 0; i < DISK_TABLE_CAPACITY; i++) {
+    Table *table = &disk->database[i];
+    if (table->name != table_name)
+      continue;
+
+    return (Resource *)hash_table_get(&table->table, key_str);
   }
 
   return NULL;
 }
 
-void bucket_print(const Bucket *bucket) {
-  printf("Bucket: \n");
-  printf("\tkey: %d\n", bucket->key);
-  printf("\tdata: %s\n", (char *)bucket->data);
-}
-
-void table_dump(const HashTable *table) {
-  printf("Table: \n");
-
-  for (size_t i = 0; i < HASH_TABLE_SIZE; i++) {
-    const HashTableNode *node = &table->nodes[i];
-
-    for (size_t j = 0; j < node->buckets_count; j++) {
-      bucket_print(&node->buckets[j]);
-    }
-  }
-
-  printf("\n");
-}
-
-void table_delete(const HashTable *table, char *key_str) {
-  const HashKey key = key_hash(key_str);
-
-  HashTableNode node = table->nodes[key];
-
-  for (size_t i = 0; i < node.buckets_count; i++) {
-    Bucket *bucket = &node.buckets[i];
-    if (bucket->key == key) {
-      node.buckets_count--;
-    }
-  }
+void resource_print(char *name, Resource *resource) {
+  printf("Resource %s\n", name);
+  printf("\tversion: %ld\n", resource->version);
+  printf("\tdata: %s\n", resource->data);
 }
 
 int main(void) {
-  table_insert(&HASH_TABLE, "Ant", (void *)"Atomicity");
-  table_dump(&HASH_TABLE);
+  char *table_name = "Table-A";
+  disk_table_new(&DISK, table_name);
+  Resource recordA = {.version = GLOBAL_CLOCK++, .data = "I prefer 2PL"};
 
-  printf("Retrieved: %s\n", (char *)table_get(&HASH_TABLE, "Ant"));
+  char X = 'X';
+  disk_insert(&DISK, table_name, &X, &recordA);
+  Resource *read = disk_read(&DISK, table_name, &X);
+  resource_print(&X, read);
 }
