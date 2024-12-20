@@ -13,6 +13,19 @@ Table *disk_table_new(Disk *disk, char *table_name) {
   return p_table;
 }
 
+Table *disk_table(Disk *disk, const char *table_name) {
+  for (size_t i = 0; i < disk->table_count; i++) {
+    Table *table = &disk->database[i];
+
+    if (table->name == table_name) {
+      return table;
+    }
+  }
+
+  fprintf(stderr, "DISK: disk_table(), Table non exist");
+  abort();
+}
+
 Resource *disk_table_read(Table *table, char *key_str) {
   return (Resource *)hash_table_get(&table->table, key_str);
 }

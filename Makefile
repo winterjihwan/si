@@ -1,7 +1,6 @@
-CFLAGS=-Wall -Wextra -std=c11 -pedantic -ggdb
+CFLAGS=-Wall -Wextra -std=c11 -pedantic
+LIB = src/tx.c src/table.c src/disk.c src/recovery.c src/snapshot.c
+SRC_PATH = src
 
-tx: tx.c table.c disk.c recovery.c
-	$(CC) $(CFLAGS) table.c disk.c recovery.c -o tx tx.c
-
-snapshot: snapshot.c disk.c
-	$(CC) $(CFLAGS) table.c disk.c -o snapshot snapshot.c
+main: src/main.c src/tx.c src/table.c src/disk.c src/recovery.c src/snapshot.c
+	$(CC) $(CFLAGS) $(LIB) -o main src/main.c

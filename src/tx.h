@@ -16,10 +16,11 @@ typedef struct {
   action_t type;
   char *data_name;
   Resource data_cur;
+  char *table_name;
 } Action;
 
 typedef long TxId;
-typedef enum { STARTED, COMMITTED, ENDED } tx_t;
+typedef enum { STARTED, COMMITTED, ABORTED } tx_t;
 typedef struct {
   char *name;
   TxId id;
@@ -31,6 +32,8 @@ typedef struct {
 
   Action actions[10];
   size_t actions_count;
+
+  Table workspace;
 } Tx;
 
 /*int tx_should_compare(const Tx *t1, const Tx *t2);*/
@@ -38,12 +41,12 @@ typedef struct {
 
 const char *action_t_to_string(const action_t action_t);
 
+Tx *tx_new(char *name, Table *table, char **names, size_t names_size);
 void tx_print(Tx *tx);
-
-void tx_read(Tx *tx, Table *table, char *rs_name);
-void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data);
+void tx_read(Tx *tx, char *rs_name);
+void tx_write(Tx *tx, char *rs_name, char *new_data);
 void tx_abort(Tx *tx);
-/*void tx_commit(Tx *tx);*/
+void tx_commit(Tx *tx, char *table_name);
 
 void global_txs_dump(void);
 void tx_schedule_dump(const Tx *t1, const Tx *t2);

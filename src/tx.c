@@ -2,13 +2,17 @@
 #include "assert.h"
 #include "disk.h"
 #include "recovery.h"
+#include "snapshot.h"
 #include "time.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-static time_t TIME = 0x01;
 static Tx GLOBAL_TXS[MAX_GLOBAL_TXS] = {0};
 static size_t GLOBAL_TXS_COUNT = 0;
+
+extern time_t TIME;
+extern Disk DISK;
 
 int tx_should_compare(const Tx *t1, const Tx *t2) {
   return t2->start_time < t1->start_time && t1->start_time < t2->commit_time;
@@ -55,10 +59,10 @@ void tx_print(Tx *tx) {
   }
 }
 
-void tx_read(Tx *tx, Table *table, char *rs_name) {
+void tx_read(Tx *tx, char *rs_name) {
   assert(tx->actions_count + 1 <= MAX_ACTIONS);
 
-  Resource rs = *disk_table_read(table, rs_name);
+  Resource rs = *disk_table_read(&tx->workspace, rs_name);
 
   const Log log = {
       .type = READ_LOG,
@@ -74,10 +78,10 @@ void tx_read(Tx *tx, Table *table, char *rs_name) {
   tx->actions[tx->actions_count++] = act;
 }
 
-void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data) {
+void tx_write(Tx *tx, char *rs_name, char *new_data) {
   assert(tx->actions_count + 1 <= MAX_ACTIONS);
 
-  Resource rs = *disk_table_read(table, rs_name);
+  Resource rs = *disk_table_read(&tx->workspace, rs_name);
 
   const Log log = {.type = WRITE_LOG,
                    .tx_id = tx->id,
@@ -87,16 +91,17 @@ void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data) {
                    .after = new_data};
   recovery_log_store(log);
 
+  rs.data = new_data;
+  disk_table_write(&tx->workspace, rs_name, (void *)&rs);
+
   const Action act = {
       .time = TIME++, .type = WRITE, .data_name = rs.name, .data_cur = rs};
   tx->actions[tx->actions_count++] = act;
-
-  rs.data = new_data;
-  disk_table_write(table, rs_name, (void *)&rs);
 }
 
 void tx_abort(Tx *tx) {
   assert(tx->actions_count + 1 <= MAX_ACTIONS);
+  fprintf(stderr, "ABORT: Transaction %s aborted \n", tx->name);
 
   const Log log = {
       .type = ABORT_TX_LOG,
@@ -108,7 +113,8 @@ void tx_abort(Tx *tx) {
   recovery_procedure_initiate(tx, &TIME);
 }
 
-void tx_commit(Tx *tx) {
+void tx_commit(Tx *tx, char *table_name) {
+  assert(tx->state != COMMITTED | tx->state != ABORTED);
   tx->commit_time = TIME++;
   tx->state = COMMITTED;
 
@@ -121,10 +127,16 @@ void tx_commit(Tx *tx) {
     }
   }
 
+  Table *table = disk_table(&DISK, table_name);
+
   for (size_t i = 0; i < tx->actions_count; i++) {
-    if (tx->actions[i].type == WRITE) {
-      tx->actions[i].time = tx->commit_time;
+    Action *action = &tx->actions[i];
+
+    if (action->type == WRITE) {
+      action->time = tx->commit_time;
     }
+
+    disk_table_write(table, action->data_name, (void *)&action->data_cur);
   }
 
   const Log log = {
@@ -171,11 +183,14 @@ void tx_schedule_dump(const Tx *t1, const Tx *t2) {
   printf("\n");
 }
 
-inline static Tx *tx_new(char *name) {
+// initialize variables to own workspace
+Tx *tx_new(char *name, Table *table, char **names, size_t names_size) {
   assert(GLOBAL_TXS_COUNT + 1 < MAX_GLOBAL_TXS);
 
   const size_t tx_idx = GLOBAL_TXS_COUNT;
   const time_t now = TIME;
+
+  const Snapshot snapshot = snapshot_initiate(&TIME, table, names, names_size);
 
   const Tx tx = {.state = STARTED,
                  .id = rand(),
@@ -184,7 +199,8 @@ inline static Tx *tx_new(char *name) {
                  .commit_time = now,
                  .end_time = now,
                  .actions = {0},
-                 .actions_count = 0};
+                 .actions_count = 0,
+                 .workspace = snapshot.table};
   GLOBAL_TXS[GLOBAL_TXS_COUNT++] = tx;
   TIME++;
 
@@ -196,42 +212,4 @@ inline static Tx *tx_new(char *name) {
   recovery_log_store(log);
 
   return &GLOBAL_TXS[tx_idx];
-}
-
-static Disk DISK = {0};
-
-int main(void) {
-  Resource r1 = resource_new(TIME++, "X", "Hi goblin!");
-  Table *tableA = disk_table_new(&DISK, "Table A");
-  disk_table_insert(tableA, r1);
-
-  /*-----------------------------------------------------*/
-
-  // t1: begin()
-  Tx *t1 = tx_new("T1");
-
-  // t1: read(x)
-  tx_read(t1, tableA, "X");
-
-  // t1: write(x)
-  tx_write(t1, tableA, "X", "Hi angel!");
-
-  // t2: begin()
-  Tx *t2 = tx_new("T2");
-
-  // t2: read(x)
-  tx_read(t2, tableA, "X");
-
-  // t2: write(x)
-  tx_write(t2, tableA, "X", "Welcome to Seoul!");
-
-  // t1: commit()
-  tx_commit(t1);
-
-  // t2: commit()
-  tx_commit(t2);
-
-  tx_schedule_dump(t1, t2);
-  /*recovery_stable_storage_dump();*/
-  /*global_txs_dump();*/
 }

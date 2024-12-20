@@ -32,18 +32,3 @@ Snapshot snapshot_initiate(time_t *time, Table *src, char **names,
 
   return (Snapshot){.table = dest};
 }
-
-static time_t TIME = 0;
-static Disk DISK = {0};
-
-int main(void) {
-  Resource r1 = resource_new(TIME++, "X", "Hi goblin!");
-  Table *tableA = disk_table_new(&DISK, "Table A");
-  disk_table_insert(tableA, r1);
-  disk_table_dump(tableA);
-
-  char *names[] = {"X"};
-  Snapshot snapshot = snapshot_initiate(&TIME, tableA, (char **)names, 1);
-
-  disk_table_dump(&snapshot.table);
-}

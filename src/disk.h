@@ -28,9 +28,12 @@ typedef struct {
 } Resource;
 
 Table *disk_table_new(Disk *disk, char *table_name);
+Table *disk_table(Disk *disk, const char *table_name);
+
 Resource *disk_table_read(Table *table, char *key_str);
 void disk_table_write(Table *table, char *key_str, void *new_data);
 void disk_table_insert(Table *table, const Resource resource);
+
 void disk_table_dump(const Table *table);
 
 void resource_print(const Resource *resource);
