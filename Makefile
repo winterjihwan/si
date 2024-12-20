@@ -4,7 +4,7 @@ main: main.c
 	$(CC) $(CFLAGS) -o main main.c
 
 esai: esai.c
-	$(CC) $(CFLAGS) -o esai esai.c
+	$(CC) $(CFLAGS) recovery.c -o esai esai.c
 
 disk: disk.c disk.h
 	$(CC) $(CFLAGS) table.c -o disk disk.c

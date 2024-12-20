@@ -20,16 +20,15 @@ typedef struct {
 
 typedef struct {
   time_t version;
+  char *name;
   char *data;
 } Resource;
 
-void disk_table_new(Disk *disk, char *table_name);
+void disk_insert(Disk *disk, char *table_name, const Resource *resource);
+Table *disk_table_new(Disk *disk, char *table_name);
+Resource *disk_table_read(Table *table, char *key_str);
 
-void disk_insert(Disk *disk, char *table_name, char *key_str,
-                 const Resource *resource);
-
-Resource *disk_read(Disk *disk, char *table_name, char *key_str);
-
-void resource_print(char *name, Resource *resource);
+void resource_print(Resource *resource);
+Resource resource_new(time_t version, char *name, char *data);
 
 #endif
