@@ -1,7 +1,6 @@
-# snapshot isolation simulation
+# SI: snapshot isolation simulator
 
-uses snapshot isolation concurrency control algorithm
-snapshot isolation is one of the more common optimistic concurrency control algorithms
+covers recovery using journaling-log system, first-committer wins policy
 
 ```bash
 make shot

@@ -9,8 +9,6 @@
 static time_t TIME = 0x01;
 static Tx GLOBAL_TXS[MAX_GLOBAL_TXS] = {0};
 static size_t GLOBAL_TXS_COUNT = 0;
-static Resource RESOURCES[MAX_RESOURCES] = {0};
-static size_t RESOURCES_COUNT = 0;
 
 int tx_should_compare(const Tx *t1, const Tx *t2) {
   return t2->start_time < t1->start_time && t1->start_time < t2->commit_time;
@@ -22,7 +20,7 @@ int tx_is_conflict(const Tx *tx) {
       continue;
     }
 
-    const time_t resource_write_time = tx->actions[i].rs->version;
+    const time_t resource_write_time = tx->actions[i].time;
     if (tx->start_time <= resource_write_time &&
         resource_write_time <= tx->commit_time) {
       return 1;
@@ -57,12 +55,6 @@ void tx_print(Tx *tx) {
   }
 }
 
-void rs_print(Resource *rs) {
-  printf("Resource %s\n", rs->name);
-  printf("\tlast write: %ld\n", (long)rs->version);
-  printf("\tdata %s\n", rs->data);
-}
-
 void tx_read(Tx *tx, Table *table, char *rs_name) {
   assert(tx->actions_count + 1 <= MAX_ACTIONS);
 
@@ -76,7 +68,8 @@ void tx_read(Tx *tx, Table *table, char *rs_name) {
   };
   recovery_log_store(log);
 
-  const Action act = {.time = TIME++, .type = READ, .rs = &rs};
+  const Action act = {
+      .time = TIME++, .type = READ, .data_name = rs.name, .data_cur = rs};
 
   tx->actions[tx->actions_count++] = act;
 }
@@ -94,7 +87,8 @@ void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data) {
                    .after = new_data};
   recovery_log_store(log);
 
-  const Action act = {.time = TIME++, .type = WRITE, .rs = &rs};
+  const Action act = {
+      .time = TIME++, .type = WRITE, .data_name = rs.name, .data_cur = rs};
   tx->actions[tx->actions_count++] = act;
 
   rs.data = new_data;
@@ -129,7 +123,7 @@ void tx_commit(Tx *tx) {
 
   for (size_t i = 0; i < tx->actions_count; i++) {
     if (tx->actions[i].type == WRITE) {
-      tx->actions[i].rs->version = tx->commit_time;
+      tx->actions[i].time = tx->commit_time;
     }
   }
 
@@ -147,12 +141,6 @@ void global_txs_dump(void) {
   }
 }
 
-void resources_dump(void) {
-  for (size_t i = 0; i < RESOURCES_COUNT; i++) {
-    rs_print(&RESOURCES[i]);
-  }
-}
-
 void tx_schedule_dump(const Tx *t1, const Tx *t2) {
   size_t t1_last_el_idx = t1->actions_count - 1;
   size_t t2_last_el_idx = t2->actions_count - 1;
@@ -167,7 +155,7 @@ void tx_schedule_dump(const Tx *t1, const Tx *t2) {
       if (t1->actions[j].time == (time_t)i) {
         const Action act = t1->actions[j];
         printf("%4zu|%11s(%s)|              \n", i,
-               action_t_to_string(act.type), act.rs->name);
+               action_t_to_string(act.type), act.data_name);
       };
     }
 
@@ -175,7 +163,7 @@ void tx_schedule_dump(const Tx *t1, const Tx *t2) {
       if (t2->actions[j].time == (time_t)i) {
         const Action act = t2->actions[j];
         printf("%4zu|              |%11s(%s) \n", i,
-               action_t_to_string(act.type), act.rs->name);
+               action_t_to_string(act.type), act.data_name);
       };
     }
   };
@@ -213,36 +201,37 @@ inline static Tx *tx_new(char *name) {
 static Disk DISK = {0};
 
 int main(void) {
-  //-Setup-//
   Resource r1 = resource_new(TIME++, "X", "Hi goblin!");
   Table *tableA = disk_table_new(&DISK, "Table A");
   disk_table_insert(tableA, r1);
-  //------//
 
+  /*-----------------------------------------------------*/
+
+  // t1: begin()
   Tx *t1 = tx_new("T1");
 
+  // t1: read(x)
   tx_read(t1, tableA, "X");
-  disk_table_dump(tableA);
+
+  // t1: write(x)
   tx_write(t1, tableA, "X", "Hi angel!");
 
-  Resource *a = disk_table_read(tableA, "X");
-  resource_print(a);
-
-  disk_table_dump(tableA);
-
+  // t2: begin()
   Tx *t2 = tx_new("T2");
 
-  tx_commit(t1);
+  // t2: read(x)
+  tx_read(t2, tableA, "X");
 
+  // t2: write(x)
   tx_write(t2, tableA, "X", "Welcome to Seoul!");
 
-  disk_table_dump(tableA);
+  // t1: commit()
+  tx_commit(t1);
 
-  tx_read(t2, tableA, "X");
+  // t2: commit()
   tx_commit(t2);
 
-  /*resources_dump();*/
-  /*tx_schedule_dump(t1, t2);*/
-  /*stable_storage_dump();*/
+  tx_schedule_dump(t1, t2);
+  /*recovery_stable_storage_dump();*/
   /*global_txs_dump();*/
 }

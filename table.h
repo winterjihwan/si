@@ -24,6 +24,7 @@ struct Bucket {
 };
 
 #define MAX_OVERFLOW_CHAINING 3
+#define MAX_KEYS_CAPACITY 100
 
 struct HashTableNode {
   Bucket buckets[MAX_OVERFLOW_CHAINING];

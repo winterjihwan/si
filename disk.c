@@ -5,9 +5,7 @@
 
 Table *disk_table_new(Disk *disk, char *table_name) {
   assert(disk->table_count + 1 < DISK_TABLE_CAPACITY);
-  Table table = {
-      .name = table_name,
-  };
+  Table table = {.name = table_name};
 
   disk->database[disk->table_count] = table;
   Table *p_table = &disk->database[disk->table_count++];

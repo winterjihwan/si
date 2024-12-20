@@ -6,6 +6,7 @@
 #include <time.h>
 
 #define DISK_TABLE_CAPACITY 5
+#define MAX_KEYS_CAPACITY 100
 
 typedef struct Table Table;
 struct Table {
@@ -17,6 +18,8 @@ typedef struct {
   Table database[DISK_TABLE_CAPACITY];
   size_t table_count;
 } Disk;
+
+static Disk LOGICAL_DISK = {0};
 
 typedef struct {
   time_t version;

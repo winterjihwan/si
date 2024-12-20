@@ -14,7 +14,8 @@ typedef enum { READ, WRITE } action_t;
 typedef struct {
   time_t time;
   action_t type;
-  Resource *rs;
+  char *data_name;
+  Resource data_cur;
 } Action;
 
 typedef long TxId;
@@ -32,21 +33,19 @@ typedef struct {
   size_t actions_count;
 } Tx;
 
-int tx_should_compare(const Tx *t1, const Tx *t2);
-int tx_is_conflict(const Tx *tx);
+/*int tx_should_compare(const Tx *t1, const Tx *t2);*/
+/*int tx_is_conflict(const Tx *tx);*/
 
 const char *action_t_to_string(const action_t action_t);
 
 void tx_print(Tx *tx);
-void rs_print(Resource *rs);
 
 void tx_read(Tx *tx, Table *table, char *rs_name);
 void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data);
 void tx_abort(Tx *tx);
-void tx_commit(Tx *tx);
+/*void tx_commit(Tx *tx);*/
 
 void global_txs_dump(void);
-void resources_dump(void);
 void tx_schedule_dump(const Tx *t1, const Tx *t2);
 
 #endif
