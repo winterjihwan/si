@@ -1,4 +1,5 @@
 #include "table.h"
+#include "disk.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -14,47 +15,38 @@ static void bucket_insert(HashTable *table, Bucket bucket) {
   node->buckets[node->buckets_count++] = bucket;
 }
 
-static Bucket bucket_new(char *key_str, const void *data,
+static Bucket bucket_new(const char *key_str, const void *data,
                          const unsigned long data_size) {
   HashKey key = key_hash(key_str);
 
   void *data_copy = malloc(data_size);
   memcpy(data_copy, data, data_size);
 
-  Bucket b = {.key = key, .data = data_copy};
+  Bucket b = {.key = key, .data = data_copy, .data_size = data_size};
 
   return b;
 }
 
-void hash_table_insert(HashTable *table, char *key_str, const void *data,
+void hash_table_insert(HashTable *table, const char *key_str, const void *data,
                        const unsigned long data_size) {
   Bucket bucket = bucket_new(key_str, data, data_size);
   bucket_insert(table, bucket);
 }
 
-void hash_table_update(HashTable *table, char *key_str, const void *new_data) {
-  Bucket *bucket = (Bucket *)hash_table_get(table, key_str);
-  if (bucket == NULL) {
-    fprintf(stderr, "HASH_TABLE: update(), Entry non exist");
-    abort();
-  }
-
-  bucket->data = new_data;
-}
-
-const void *hash_table_get(const HashTable *table, char *key_str) {
+static inline Bucket *hash_table_bucket_get(HashTable *table,
+                                            const char *key_str) {
   const HashKey key = key_hash(key_str);
 
-  HashTableNode node = table->nodes[key % HASH_TABLE_SIZE];
+  HashTableNode *node = &table->nodes[key % HASH_TABLE_SIZE];
 
-  for (size_t i = 0; i < node.buckets_count; i++) {
-    Bucket *bucket = &node.buckets[i];
+  for (size_t i = 0; i < node->buckets_count; i++) {
+    Bucket *bucket = &node->buckets[i];
     if (bucket->key == key) {
-      return bucket->data;
+      return bucket;
     }
   }
 
-  fprintf(stderr, "HASH_TABLE: get(), Entry non exist");
+  fprintf(stderr, "HASH_TABLE: hash_table_bucket_get(), Entry non exist");
   abort();
 }
 
@@ -62,6 +54,20 @@ void bucket_print(const Bucket *bucket) {
   printf("Bucket: \n");
   printf("\tkey: %d\n", bucket->key);
   printf("\tdata: %s\n", (char *)bucket->data);
+}
+
+void hash_table_update(HashTable *table, const char *key_str, void *new_data,
+                       const unsigned long new_data_size) {
+  Bucket *bucket = hash_table_bucket_get(table, key_str);
+
+  void *data_copy = malloc(new_data_size);
+  memcpy(data_copy, new_data, new_data_size);
+  bucket->data = data_copy;
+}
+
+const void *hash_table_get(HashTable *table, char *key_str) {
+  Bucket *bucket = hash_table_bucket_get(table, key_str);
+  return bucket->data;
 }
 
 // assumes data: char*

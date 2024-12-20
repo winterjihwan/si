@@ -96,6 +96,9 @@ void tx_write(Tx *tx, Table *table, char *rs_name, char *new_data) {
 
   const Action act = {.time = TIME++, .type = WRITE, .rs = &rs};
   tx->actions[tx->actions_count++] = act;
+
+  rs.data = new_data;
+  disk_table_write(table, rs_name, (void *)&rs);
 }
 
 void tx_abort(Tx *tx) {
@@ -219,7 +222,11 @@ int main(void) {
   Tx *t1 = tx_new("T1");
 
   tx_read(t1, tableA, "X");
+  disk_table_dump(tableA);
   tx_write(t1, tableA, "X", "Hi angel!");
+
+  Resource *a = disk_table_read(tableA, "X");
+  resource_print(a);
 
   disk_table_dump(tableA);
 
@@ -227,7 +234,7 @@ int main(void) {
 
   tx_commit(t1);
 
-  tx_write(t2, tableA, "X", "Welcome to Seoul");
+  tx_write(t2, tableA, "X", "Welcome to Seoul!");
 
   disk_table_dump(tableA);
 

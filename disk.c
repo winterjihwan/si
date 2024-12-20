@@ -19,8 +19,9 @@ Resource *disk_table_read(Table *table, char *key_str) {
   return (Resource *)hash_table_get(&table->table, key_str);
 }
 
-void disk_table_write(Table *table, char *key_str, char *new_data) {
-  hash_table_update(&table->table, key_str, new_data);
+void disk_table_write(Table *table, char *key_str, void *new_data) {
+  hash_table_update(&table->table, key_str, new_data,
+                    sizeof(*(Resource *)new_data));
 }
 
 void disk_table_insert(Table *table, const Resource resource) {

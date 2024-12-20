@@ -26,7 +26,7 @@ typedef struct {
 
 Table *disk_table_new(Disk *disk, char *table_name);
 Resource *disk_table_read(Table *table, char *key_str);
-void disk_table_update(Table *table, char *key_str, char *new_data);
+void disk_table_write(Table *table, char *key_str, void *new_data);
 void disk_table_insert(Table *table, const Resource resource);
 void disk_table_dump(const Table *table);
 

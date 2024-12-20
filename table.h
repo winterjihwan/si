@@ -18,7 +18,8 @@ typedef struct HashTableNode HashTableNode;
 
 struct Bucket {
   HashKey key;
-  const void *data;
+  void *data;
+  unsigned long data_size;
   Bucket *next;
 };
 
@@ -45,11 +46,15 @@ inline static HashKey key_hash(const char *key_str) {
   return key;
 }
 
-void hash_table_insert(HashTable *table, char *key_str, const void *data,
+void hash_table_insert(HashTable *table, const char *key_str, const void *data,
                        const unsigned long data_size);
-void hash_table_update(HashTable *table, char *key_str, const void *new_data);
-const void *hash_table_get(const HashTable *table, char *key_str);
+void hash_table_update(HashTable *table, const char *key_str, void *new_data,
+                       const unsigned long new_data_size);
+const void *hash_table_get(HashTable *table, char *key_str);
 void hash_table_delete(const HashTable *table, char *key_str);
 void hash_table_dump(const HashTable *table);
+
+static inline Bucket *hash_table_bucket_get(HashTable *table,
+                                            const char *key_str);
 
 #endif
