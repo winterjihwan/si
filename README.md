@@ -45,6 +45,16 @@
 
 <br />
 
+## 🚀 사용법
+
+```bash
+make main
+./main
+
+<br />
+
 ## 📚 참고자료
 
 **Database System Concepts** (7th ed.) by Abraham Silberschatz et al.
+```
+
