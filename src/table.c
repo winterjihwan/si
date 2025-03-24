@@ -1,5 +1,4 @@
 #include "table.h"
-#include "disk.h"
 #include <stdio.h>
 #include <string.h>
 
